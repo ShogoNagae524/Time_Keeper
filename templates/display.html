@@ -1,0 +1,84 @@
+<!--
+  display.html — モニター用の画面（/display）
+
+  【このファイルの役割】
+  画面の「骨組み」だけを書いています。中身は JavaScript が描きます。
+    - 左 約2/3：アナログ時計（static/clock.js が描く）
+    - 右 約1/3：ミニ月カレンダー・予定リスト（static/calendar.js が描く）と QR コード
+  見た目（色・大きさ・配置）は static/style.css にあります。
+-->
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>部室モニター</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="display">
+  <!-- ===== 左：アナログ時計 ===== -->
+  <section class="clock-pane">
+    <!--
+      viewBox="-100 -100 200 200" にすると、時計の中心が (0, 0)、半径が 100 の
+      座標で描けるので、角度の計算が簡単になります。
+    -->
+    <svg id="clock" class="clock" viewBox="-100 -100 200 200" aria-label="アナログ時計">
+      <circle class="clock-face" r="97"></circle>
+      <g id="clock-ticks"></g>     <!-- 目盛り（clock.js が描く） -->
+      <g id="clock-numbers"></g>   <!-- 1〜12 の数字（clock.js が描く） -->
+      <!-- 時限表示：中央より少し下 -->
+      <text id="clock-period" class="clock-period" x="0" y="38"></text>
+      <!-- 針は (0,0) から真上（12時方向）に向けて描き、rotate で回す -->
+      <line id="hand-hour" class="hand hand-hour" x1="0" y1="10" x2="0" y2="-48"></line>
+      <line id="hand-minute" class="hand hand-minute" x1="0" y1="14" x2="0" y2="-74"></line>
+      <circle class="clock-center" r="3.5"></circle>
+    </svg>
+    <!-- 時計の下の日付と曜日 -->
+    <div id="clock-date" class="clock-date"></div>
+  </section>
+
+  <!-- ===== 右：カレンダーと予定 ===== -->
+  <section class="calendar-pane">
+    <!-- 上段：ミニ月カレンダー -->
+    <div class="mini-calendar">
+      <div id="cal-title" class="cal-title"></div>
+      <div id="cal-grid" class="cal-grid"></div>
+    </div>
+
+    <!-- 中段：今後の予定 -->
+    <div class="event-section">
+      <h2>今後の予定</h2>
+      <ul id="upcoming-list" class="event-list"></ul>
+    </div>
+
+    <!-- 下段：重要な予定（上の一覧に入らなかったもの） -->
+    <div class="event-section" id="important-section">
+      <h2>重要な予定</h2>
+      <ul id="important-list" class="event-list"></ul>
+    </div>
+
+    <!-- 右下：入力画面の QR コード -->
+    <div class="qr-box">
+      <img src="{{ url_for('qr_code') }}" alt="入力画面の QR コード">
+      <div class="qr-text">
+        <div class="qr-label">予定を追加・編集</div>
+        <div class="qr-url">{{ edit_url }}</div>
+      </div>
+    </div>
+  </section>
+
+  <!--
+    config.py の設定を JavaScript に渡す。
+    tojson は Python の値を安全に JavaScript の値に変換するフィルターです。
+  -->
+  <script>
+    window.APP_CONFIG = {
+      periods: {{ periods | tojson }},
+      noPeriodLabel: {{ no_period_label | tojson }},
+      refreshSeconds: {{ refresh_seconds | tojson }}
+    };
+  </script>
+  <script src="{{ url_for('static', filename='clock.js') }}"></script>
+  <script src="{{ url_for('static', filename='calendar.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,498 @@
+/*
+ * style.css — 見た目（色・大きさ・配置）
+ *
+ * 【このファイルの役割】
+ *   前半：モニター画面（/display、body.display）
+ *   後半：スマホ用の入力画面（/、body.edit）
+ *
+ * よく変えそうな色は、すぐ下の :root にまとめています。
+ * モニター画面の文字の大きさは「vh」（画面の高さに対する %）で指定しているので、
+ * モニターの大きさが変わっても同じ見た目の比率になります。
+ */
+
+:root {
+  --bg: #000;            /* モニターの背景色 */
+  --fg: #fff;            /* モニターの文字色 */
+  --dim: #9a9a9a;        /* 控えめな文字（日付・補足など） */
+  --line: #333;          /* 区切り線 */
+  --accent: #ffd54a;     /* 重要予定・今日の強調色 */
+  --sun: #ff7b7b;        /* 日曜日 */
+  --sat: #7bb6ff;        /* 土曜日 */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", sans-serif;
+}
+
+/* ==========================================================================
+   モニター画面（/display）
+   ========================================================================== */
+
+body.display {
+  background: var(--bg);
+  color: var(--fg);
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;      /* モニターはスクロールしないので、はみ出しは隠す */
+  display: flex;
+  cursor: none;          /* マウスカーソルを隠す */
+}
+
+/* ---- 左：アナログ時計（約 2/3） ---- */
+
+.clock-pane {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 3vh 2vw;
+}
+
+.clock {
+  /* 画面の高さ・左側の幅のどちらにも収まる大きさにする */
+  width: min(82vh, 62vw);
+  height: min(82vh, 62vw);
+}
+
+.clock-face {
+  fill: var(--bg);
+  stroke: var(--fg);
+  stroke-width: 1.5;
+}
+
+.tick {
+  stroke: var(--fg);
+  stroke-width: 0.8;
+}
+
+.tick-hour {
+  stroke-width: 2.2;
+}
+
+.clock-number {
+  fill: var(--fg);
+  font-size: 13px;       /* SVG 内の大きさ（時計の半径 = 100 に対する大きさ） */
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.clock-period {
+  fill: var(--fg);
+  font-size: 10px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  letter-spacing: 0.5px;
+}
+
+.hand {
+  stroke: var(--fg);
+  stroke-linecap: round;
+}
+
+.hand-hour {
+  stroke-width: 5;
+}
+
+.hand-minute {
+  stroke-width: 3;
+}
+
+.clock-center {
+  fill: var(--fg);
+}
+
+.clock-date {
+  margin-top: 2vh;
+  font-size: 5vh;
+  letter-spacing: 0.1em;
+}
+
+/* ---- 右：カレンダーと予定（約 1/3） ---- */
+
+.calendar-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.6vh;
+  padding: 2.5vh 2vw 2vh 1vw;
+  border-left: 1px solid var(--line);
+}
+
+/* ミニ月カレンダー */
+.cal-title {
+  font-size: 2.8vh;
+  font-weight: 600;
+  margin-bottom: 0.4vh;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 2vh;
+  line-height: 1.3;
+}
+
+.cal-head {
+  color: var(--dim);
+  font-size: 1.8vh;
+}
+
+.cal-cell {
+  position: relative;
+  padding: 0.2vh 0 0.8vh;
+}
+
+.cal-head.sun,
+.cal-cell.sun {
+  color: var(--sun);
+}
+
+.cal-head.sat,
+.cal-cell.sat {
+  color: var(--sat);
+}
+
+/* 今日：白い丸の中に黒文字 */
+.cal-cell.today .cal-day {
+  display: inline-block;
+  min-width: 3vh;
+  border-radius: 999px;
+  background: var(--fg);
+  color: var(--bg);
+  font-weight: 700;
+}
+
+/* 予定のある日：日にちの下に小さな点 */
+.cal-cell.marked::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0.05vh;
+  width: 0.7vh;
+  height: 0.7vh;
+  margin-left: -0.35vh;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* 予定リスト（今後の予定・重要な予定） */
+.event-section {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.event-section h2 {
+  margin: 0 0 0.4vh;
+  font-size: 2vh;
+  font-weight: 600;
+  color: var(--dim);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.4vh;
+}
+
+.event-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* 1件 = 「日付 | タイトル（時刻） | あと○日」の1行 */
+.event {
+  display: flex;
+  align-items: baseline;
+  gap: 0.8vw;
+  padding: 0.3vh 0;
+  line-height: 1.25;
+}
+
+.event-date {
+  flex-shrink: 0;
+  width: 5.6em;          /* 日付の幅をそろえて、タイトルの頭を縦にそろえる */
+  font-size: 1.9vh;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.event-time {
+  margin-left: 0.6em;
+  font-size: 1.8vh;
+  color: var(--dim);
+  font-weight: 400;
+}
+
+.event-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 2.4vh;
+  /* 長いタイトルは「…」で省略して1行に収める */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.event.important .event-title {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* 右端の「あと○日」 */
+.event-days {
+  flex-shrink: 0;
+  font-size: 2.1vh;
+  font-variant-numeric: tabular-nums;
+}
+
+.event-days.is-today {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.event-empty {
+  color: var(--dim);
+  font-size: 2vh;
+  padding: 0.5vh 0;
+}
+
+/* 右下：QR コード */
+.qr-box {
+  margin-top: auto;      /* 右の列の一番下に寄せる */
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1vw;
+}
+
+.qr-box img {
+  width: 12vh;
+  height: 12vh;
+  display: block;
+}
+
+.qr-label {
+  font-size: 2.2vh;
+  font-weight: 600;
+}
+
+.qr-url {
+  font-size: 1.4vh;
+  color: var(--dim);
+  word-break: break-all;
+}
+
+/* ==========================================================================
+   スマホ用の入力画面（/）
+   ========================================================================== */
+
+body.edit {
+  background: #f3f4f6;
+  color: #1f2937;
+  font-size: 16px;       /* 16px 未満だと iPhone で入力時に画面が拡大されるため */
+  line-height: 1.5;
+}
+
+.edit-header {
+  background: #111;
+  color: #fff;
+  padding: 12px 16px;
+}
+
+.edit-header h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.edit-main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 12px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.card h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.field {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.field > span {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.required {
+  font-style: normal;
+  font-size: 12px;
+  color: #fff;
+  background: #dc2626;
+  border-radius: 4px;
+  padding: 0 4px;
+  margin-left: 4px;
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  font: inherit;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+}
+
+.field-row {
+  display: flex;
+  gap: 12px;
+}
+
+.field-row .field {
+  flex: 1;
+  min-width: 0;
+}
+
+.hint {
+  margin: -6px 0 12px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.check input {
+  width: 22px;
+  height: 22px;
+}
+
+.form-errors {
+  color: #dc2626;
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+
+.form-errors:empty {
+  display: none;
+}
+
+.buttons {
+  display: flex;
+  gap: 8px;
+}
+
+button {
+  font: inherit;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+}
+
+button.primary {
+  background: #111;
+  color: #fff;
+  flex: 1;
+}
+
+button.secondary {
+  background: #e5e7eb;
+  color: #111;
+}
+
+button.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.edit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.edit-item {
+  border-top: 1px solid #e5e7eb;
+  padding: 12px 0;
+}
+
+.edit-item:first-child {
+  border-top: none;
+}
+
+.edit-when {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.edit-title {
+  font-size: 17px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.edit-item.important .edit-title {
+  color: #b45309;
+}
+
+.edit-meta {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.edit-memo {
+  font-size: 14px;
+  white-space: pre-wrap;  /* メモの改行をそのまま表示する */
+  overflow-wrap: anywhere;
+  margin-top: 4px;
+}
+
+.edit-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.edit-buttons button {
+  padding: 6px 14px;
+  font-size: 14px;
+}
+
+.edit .event-empty {
+  color: #6b7280;
+  font-size: 15px;
+}

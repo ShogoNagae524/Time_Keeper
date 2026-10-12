@@ -1,0 +1,269 @@
+<!--
+  edit.html — スマホ用の入力画面（/）
+
+  【このファイルの役割】
+  モニターの QR コードから開く画面です。誰でも予定の一覧・追加・修正・削除ができます。
+  サーバーとのやり取りは、下の <script> の中で /api/events を呼んで行います。
+  見た目は static/style.css の「入力画面」の部分にあります。
+-->
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>部の予定 追加・編集</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="edit">
+  <header class="edit-header">
+    <h1>部の予定</h1>
+  </header>
+
+  <main class="edit-main">
+    <!-- ===== 追加・修正フォーム ===== -->
+    <section class="card">
+      <h2 id="form-title">予定を追加</h2>
+      <form id="event-form" novalidate>
+        <!-- 修正中の予定の id（追加のときは空） -->
+        <input type="hidden" id="event-id">
+
+        <label class="field">
+          <span>タイトル <em class="required">必須</em></span>
+          <input type="text" id="title" maxlength="100" required>
+        </label>
+
+        <label class="field">
+          <span>日付 <em class="required">必須</em></span>
+          <input type="date" id="date" required>
+        </label>
+
+        <div class="field-row">
+          <label class="field">
+            <span>開始時刻</span>
+            <input type="time" id="start_time">
+          </label>
+          <label class="field">
+            <span>終了時刻</span>
+            <input type="time" id="end_time">
+          </label>
+        </div>
+        <p class="hint">時刻を入れなければ「終日」になります。</p>
+
+        <label class="check">
+          <input type="checkbox" id="important">
+          <span>重要（モニターで ★ を付けて強調）</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="yearly">
+          <span>毎年繰り返す（誕生日など）</span>
+        </label>
+
+        <label class="field">
+          <span>登録者名</span>
+          <input type="text" id="author" maxlength="50">
+        </label>
+
+        <label class="field">
+          <span>メモ</span>
+          <textarea id="memo" rows="3" maxlength="500"></textarea>
+        </label>
+
+        <ul id="form-errors" class="form-errors"></ul>
+
+        <div class="buttons">
+          <button type="submit" id="submit-button" class="primary">追加する</button>
+          <button type="button" id="cancel-button" class="secondary" hidden>修正をやめる</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ===== 予定の一覧 ===== -->
+    <section class="card">
+      <h2>登録されている予定</h2>
+      <ul id="event-list" class="edit-list"></ul>
+    </section>
+  </main>
+
+  <script>
+    /*
+     * 入力画面の動き
+     *   - 予定の一覧を読み込んで表示する（loadEvents）
+     *   - フォームから追加・修正する（submitForm）
+     *   - 一覧の「修正」でフォームに内容を読み込む（startEdit）
+     *   - 一覧の「削除」で確認してから削除する（deleteEvent）
+     */
+    (function () {
+      "use strict";
+
+      const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+      const form = document.getElementById("event-form");
+      // フォームの入力欄（id 名がそのまま API の項目名になっている）
+      const textFields = ["title", "date", "start_time", "end_time", "author", "memo"];
+      const checkFields = ["important", "yearly"];
+
+      // 一覧に表示中の予定（修正ボタンを押したときに中身を取り出すため）
+      let events = [];
+
+      /** HTML の要素を作る。文字は textContent で入れるので安全。 */
+      function el(tag, className, text) {
+        const e = document.createElement(tag);
+        if (className) e.className = className;
+        if (text !== undefined) e.textContent = text;
+        return e;
+      }
+
+      /** "YYYY-MM-DD" を「2026/10/15（木）」の形にする。 */
+      function formatDate(key) {
+        const [y, m, d] = key.split("-").map(Number);
+        const w = new Date(y, m - 1, d).getDay();
+        return y + "/" + m + "/" + d + "（" + WEEKDAYS[w] + "）";
+      }
+
+      /** エラーメッセージをフォームの下に表示する（空配列なら消す）。 */
+      function showErrors(messages) {
+        const ul = document.getElementById("form-errors");
+        ul.innerHTML = "";
+        messages.forEach(function (m) { ul.appendChild(el("li", "", m)); });
+      }
+
+      /** フォームを空にして「追加」モードに戻す。 */
+      function resetForm() {
+        form.reset();
+        document.getElementById("event-id").value = "";
+        document.getElementById("form-title").textContent = "予定を追加";
+        document.getElementById("submit-button").textContent = "追加する";
+        document.getElementById("cancel-button").hidden = true;
+        showErrors([]);
+      }
+
+      /** 一覧の「修正」を押したとき：その予定の内容をフォームに入れて「修正」モードにする。 */
+      function startEdit(ev) {
+        document.getElementById("event-id").value = ev.id;
+        textFields.forEach(function (f) {
+          document.getElementById(f).value = ev[f] || "";
+        });
+        checkFields.forEach(function (f) {
+          document.getElementById(f).checked = !!ev[f];
+        });
+        document.getElementById("form-title").textContent = "予定を修正";
+        document.getElementById("submit-button").textContent = "修正を保存";
+        document.getElementById("cancel-button").hidden = false;
+        showErrors([]);
+        form.scrollIntoView({ behavior: "smooth" });
+      }
+
+      /** 予定を削除する。誤操作防止のため、先に確認ダイアログを出す。 */
+      function deleteEvent(ev) {
+        let message = "「" + ev.title + "」を削除しますか？";
+        if (ev.yearly) message += "\n（毎年繰り返す予定なので、すべての年から消えます）";
+        if (!confirm(message)) return;
+
+        fetch("/api/events/" + ev.id, { method: "DELETE" })
+          .then(function (res) {
+            if (!res.ok && res.status !== 404) throw new Error("HTTP " + res.status);
+            // 修正中の予定を消したらフォームも戻す
+            if (document.getElementById("event-id").value === String(ev.id)) resetForm();
+            loadEvents();
+          })
+          .catch(function () { alert("削除できませんでした。通信状態を確認してください。"); });
+      }
+
+      /** 予定の一覧を描く。 */
+      function renderList() {
+        const ul = document.getElementById("event-list");
+        ul.innerHTML = "";
+        if (events.length === 0) {
+          ul.appendChild(el("li", "event-empty", "予定はまだありません"));
+          return;
+        }
+        events.forEach(function (ev) {
+          const li = el("li", "edit-item" + (ev.important ? " important" : ""));
+
+          // 日付と時刻
+          let when = formatDate(ev.next_date);
+          if (ev.start_time) when += " " + ev.start_time + "〜" + (ev.end_time || "");
+          else when += " 終日";
+          li.appendChild(el("div", "edit-when", when));
+
+          li.appendChild(el("div", "edit-title", (ev.important ? "★ " : "") + ev.title));
+
+          // 付加情報（毎年・登録者・メモ）
+          const tags = [];
+          if (ev.yearly) tags.push("毎年");
+          if (ev.author) tags.push("登録: " + ev.author);
+          if (tags.length) li.appendChild(el("div", "edit-meta", tags.join(" ・ ")));
+          if (ev.memo) li.appendChild(el("div", "edit-memo", ev.memo));
+
+          const buttons = el("div", "edit-buttons");
+          const editBtn = el("button", "secondary", "修正");
+          editBtn.type = "button";
+          editBtn.addEventListener("click", function () { startEdit(ev); });
+          const delBtn = el("button", "danger", "削除");
+          delBtn.type = "button";
+          delBtn.addEventListener("click", function () { deleteEvent(ev); });
+          buttons.appendChild(editBtn);
+          buttons.appendChild(delBtn);
+          li.appendChild(buttons);
+
+          ul.appendChild(li);
+        });
+      }
+
+      /** サーバーから予定の一覧を取ってきて表示する。 */
+      function loadEvents() {
+        fetch("/api/events", { cache: "no-store" })
+          .then(function (res) { return res.json(); })
+          .then(function (data) { events = data; renderList(); })
+          .catch(function () {
+            const ul = document.getElementById("event-list");
+            ul.innerHTML = "";
+            ul.appendChild(el("li", "event-empty", "読み込めませんでした。再読み込みしてください。"));
+          });
+      }
+
+      /** フォームの「追加する / 修正を保存」を押したとき。 */
+      function submitForm(e) {
+        e.preventDefault(); // ページが再読み込みされないようにする
+
+        // 入力欄の値を集めて、API に送る形（オブジェクト）にする
+        const payload = {};
+        textFields.forEach(function (f) { payload[f] = document.getElementById(f).value; });
+        checkFields.forEach(function (f) { payload[f] = document.getElementById(f).checked; });
+
+        // 送る前に簡単なチェック（詳しいチェックはサーバー側 app.py の validate_event）
+        const errors = [];
+        if (!payload.title.trim()) errors.push("タイトルを入力してください");
+        if (!payload.date) errors.push("日付を入力してください");
+        if (errors.length) { showErrors(errors); return; }
+
+        const id = document.getElementById("event-id").value;
+        const button = document.getElementById("submit-button");
+        button.disabled = true; // 二重送信の防止
+
+        fetch(id ? "/api/events/" + id : "/api/events", {
+          method: id ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+          .then(function (res) {
+            return res.json().catch(function () { return {}; }).then(function (body) {
+              if (res.status === 404) {
+                throw ["この予定はすでに削除されています"];
+              }
+              if (!res.ok) throw body.errors || ["保存できませんでした"];
+            });
+          })
+          .then(function () { resetForm(); loadEvents(); })
+          .catch(function (err) {
+            showErrors(Array.isArray(err) ? err : ["通信できませんでした。通信状態を確認してください。"]);
+          })
+          .finally(function () { button.disabled = false; });
+      }
+
+      form.addEventListener("submit", submitForm);
+      document.getElementById("cancel-button").addEventListener("click", resetForm);
+      loadEvents();
+    })();
+  </script>
+</body>
+</html>

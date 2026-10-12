@@ -1,0 +1,7 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# 予定データとログ（部室の Mac mini ごとに違うので Git には入れない）
+data/

@@ -1,0 +1,10 @@
+[project]
+name = "time-keeper"
+version = "0.1.0"
+description = "部室モニター表示システム（アナログ時計と部の予定）"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "flask>=3.1.3",
+    "segno>=1.6.6",
+]
